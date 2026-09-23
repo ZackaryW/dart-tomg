@@ -1,0 +1,25 @@
+name: tomg
+description: >-
+  Runtime for dart-tomg: annotations, the Obfuscated<D> interface, and the
+  reversible codec behind .deobf. Generated code from tomgen depends on this
+  at build time; apps depend on it at runtime.
+version: 0.1.0
+repository: https://github.com/ZackaryW/dart-tomg/tree/main/tomg
+issue_tracker: https://github.com/ZackaryW/dart-tomg/issues
+topics:
+  - toml
+  - code-generation
+  - configuration
+  - obfuscation
+
+environment:
+  sdk: ^3.12.2
+
+resolution: workspace
+
+# Deliberately no dependencies: this ships in the consuming app.
+dependencies:
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

@@ -1,0 +1,10 @@
+name: dart_tomg_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+workspace:
+  - tomg
+  - tomgen
+  - example
