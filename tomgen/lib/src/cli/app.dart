@@ -188,16 +188,12 @@ final class TomgenApp {
           final result = _generator.generate(_workingDirectory);
           _printGeneration(result);
           _out.writeln('Running build_runner...');
-          return _processRunner(
-            Platform.resolvedExecutable,
-            <String>[
-              'run',
-              'build_runner',
-              'build',
-              ...invocation.forwardedArguments,
-            ],
-            workingDirectory: result.project.root.path,
-          );
+          return await _processRunner(Platform.resolvedExecutable, <String>[
+            'run',
+            'build_runner',
+            'build',
+            ...invocation.forwardedArguments,
+          ], workingDirectory: result.project.root.path);
       }
     } on TomgenException catch (error) {
       _err.writeln('tomgen: ${error.message}');

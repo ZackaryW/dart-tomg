@@ -16,9 +16,11 @@ local `tomg` package during development. No manifest rewriting is required.
 
 ## Validate the workspace
 
-GitHub Actions runs this sequence on the minimum supported Dart SDK (`3.12.2`)
-and the current stable SDK. From a clean repository checkout, run the same gates
-from the repository root:
+GitHub Actions runs analysis, tests, generation, and archive validation on the
+minimum supported Dart SDK (`3.12.2`) and the current stable SDK. Formatting is
+checked once with the current stable SDK because Dart formatter output can change
+between SDK releases. From a clean repository checkout, run the same gates from
+the repository root, using the current stable SDK for the format command:
 
 ```
 dart pub get

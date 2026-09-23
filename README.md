@@ -289,8 +289,10 @@ dart pub -C tomg publish --dry-run
 dart pub -C tomgen publish --dry-run
 ```
 
-GitHub Actions runs the same gates on Dart 3.12.2 and the current stable SDK.
-See [PUBLISHING.md](PUBLISHING.md) for failure reproduction and the required
+GitHub Actions runs analysis, tests, generation, and archive validation on Dart
+3.12.2 and the current stable SDK. Stable owns the formatting check because
+formatter output can change between SDK releases. See
+[PUBLISHING.md](PUBLISHING.md) for failure reproduction and the required
 `tomg`-before-`tomgen` release order.
 
 ## License

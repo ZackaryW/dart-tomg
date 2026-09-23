@@ -4,45 +4,43 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
-  test(
-    'starter and custom init build compilable registries',
-    () async {
-      final workspace = _workspaceRoot();
-      for (final fixture in <_Fixture>[
-        const _Fixture(
-          name: 'starter',
-          initArguments: <String>['init'],
-          target: 'items',
-        ),
-        const _Fixture(
-          name: 'custom',
-          source: '''
+  test('starter and custom init build compilable registries', () async {
+    final workspace = _workspaceRoot();
+    for (final fixture in <_Fixture>[
+      const _Fixture(
+        name: 'starter',
+        initArguments: <String>['init'],
+        target: 'items',
+      ),
+      const _Fixture(
+        name: 'custom',
+        source: '''
 [primary]
 code = "primary"
 enabled = true
 ''',
-          initArguments: <String>[
-            'init',
-            '--source',
-            'config/services.toml',
-            '--target',
-            'services',
-            '--model',
-            'Service',
-            '--key',
-            'code',
-          ],
-          target: 'services',
-        ),
-      ]) {
-        final root = Directory.systemTemp.createTempSync(
-          'tomgen_init_${fixture.name}_',
-        );
-        addTearDown(() {
-          if (root.existsSync()) root.deleteSync(recursive: true);
-        });
-        Directory(p.join(root.path, 'lib')).createSync();
-        File(p.join(root.path, 'pubspec.yaml')).writeAsStringSync('''
+        initArguments: <String>[
+          'init',
+          '--source',
+          'config/services.toml',
+          '--target',
+          'services',
+          '--model',
+          'Service',
+          '--key',
+          'code',
+        ],
+        target: 'services',
+      ),
+    ]) {
+      final root = Directory.systemTemp.createTempSync(
+        'tomgen_init_${fixture.name}_',
+      );
+      addTearDown(() {
+        if (root.existsSync()) root.deleteSync(recursive: true);
+      });
+      Directory(p.join(root.path, 'lib')).createSync();
+      File(p.join(root.path, 'pubspec.yaml')).writeAsStringSync('''
 name: tomgen_init_${fixture.name}
 environment:
   sdk: ^3.12.2
@@ -57,51 +55,49 @@ dependency_overrides:
   tomg:
     path: ${p.join(workspace.path, 'tomg')}
 ''');
-        if (fixture.source != null) {
-          final source = File(p.join(root.path, 'config/services.toml'));
-          source.parent.createSync(recursive: true);
-          source.writeAsStringSync(fixture.source!);
-        }
-
-        await _run(root, <String>['pub', 'get']);
-        await _run(root, <String>['run', 'tomgen', ...fixture.initArguments]);
-        expect(
-          File(p.join(root.path, 'pubspec.yaml')).readAsStringSync(),
-          isNot(contains('assets:')),
-        );
-        expect(
-          File(p.join(root.path, 'build.yaml')).readAsStringSync(),
-          contains(fixture.sourcePath),
-        );
-        if (fixture.source != null) {
-          expect(
-            File(p.join(root.path, fixture.sourcePath)).readAsStringSync(),
-            fixture.source,
-          );
-        }
-        expect(
-          Directory(p.join(root.path, 'lib'))
-              .listSync(recursive: true)
-              .whereType<File>()
-              .where((file) => p.extension(file.path) == '.toml'),
-          isEmpty,
-        );
-
-        await _run(root, <String>['run', 'tomgen', 'build']);
-        final model = File(
-          p.join(root.path, 'lib/generated/${fixture.target}.dart'),
-        );
-        final registry = File(
-          p.join(root.path, 'lib/generated/${fixture.target}.g.dart'),
-        );
-        expect(model.existsSync(), isTrue, reason: fixture.name);
-        expect(registry.existsSync(), isTrue, reason: fixture.name);
-        expect(registry.readAsStringSync(), contains('const Map<'));
-        await _run(root, <String>['analyze']);
+      if (fixture.source != null) {
+        final source = File(p.join(root.path, 'config/services.toml'));
+        source.parent.createSync(recursive: true);
+        source.writeAsStringSync(fixture.source!);
       }
-    },
-    timeout: const Timeout(Duration(minutes: 4)),
-  );
+
+      await _run(root, <String>['pub', 'get']);
+      await _run(root, <String>['run', 'tomgen', ...fixture.initArguments]);
+      expect(
+        File(p.join(root.path, 'pubspec.yaml')).readAsStringSync(),
+        isNot(contains('assets:')),
+      );
+      expect(
+        File(p.join(root.path, 'build.yaml')).readAsStringSync(),
+        contains(fixture.sourcePath),
+      );
+      if (fixture.source != null) {
+        expect(
+          File(p.join(root.path, fixture.sourcePath)).readAsStringSync(),
+          fixture.source,
+        );
+      }
+      expect(
+        Directory(p.join(root.path, 'lib'))
+            .listSync(recursive: true)
+            .whereType<File>()
+            .where((file) => p.extension(file.path) == '.toml'),
+        isEmpty,
+      );
+
+      await _run(root, <String>['run', 'tomgen', 'build']);
+      final model = File(
+        p.join(root.path, 'lib/generated/${fixture.target}.dart'),
+      );
+      final registry = File(
+        p.join(root.path, 'lib/generated/${fixture.target}.g.dart'),
+      );
+      expect(model.existsSync(), isTrue, reason: fixture.name);
+      expect(registry.existsSync(), isTrue, reason: fixture.name);
+      expect(registry.readAsStringSync(), contains('const Map<'));
+      await _run(root, <String>['analyze']);
+    }
+  }, timeout: const Timeout(Duration(minutes: 4)));
 }
 
 Directory _workspaceRoot() {

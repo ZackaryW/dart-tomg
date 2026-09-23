@@ -38,6 +38,12 @@ void main() {
     );
     expect(
       _validateWorkflow(
+        workflow.replaceFirst("if: matrix.sdk == 'stable'", 'if: always()'),
+      ),
+      contains(contains('format only on Dart stable')),
+    );
+    expect(
+      _validateWorkflow(
         workflow.replaceFirst(
           'dart pub -C tomgen publish --dry-run',
           'dart pub -C tomgen publish --dry-run --ignore-warnings',
@@ -143,6 +149,11 @@ List<String> _validateWorkflow(String source) {
     if (condition is! String || !condition.contains("matrix.sdk == '3.12.2'")) {
       issues.add('$name must run only on Dart 3.12.2.');
     }
+  }
+  final formatCondition = namedSteps['Check formatting']?['if'];
+  if (formatCondition is! String ||
+      !formatCondition.contains("matrix.sdk == 'stable'")) {
+    issues.add('Check formatting must format only on Dart stable.');
   }
   if (source.contains('--ignore-warnings') ||
       source.contains('--skip-validation')) {
