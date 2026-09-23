@@ -1,0 +1,38 @@
+# Enum values use exact Dart member names. Environment substitution applies to
+# one array item; it does not replace or split the complete array.
+
+[starter]
+tier = "starter"
+regions = ["us-east", "$TOMG_EXAMPLE_REGION_UNSET_5A7C2E9B=eu-west"]
+transports = ["https"]
+
+[starter.limits]
+projects = 3
+storageGb = 10.0
+
+[[starter.locations]]
+code = "us-east"
+primary = true
+
+[[starter.locations]]
+code = "eu-west"
+primary = false
+
+[enterprise]
+tier = "enterprise"
+regions = ["us-east", "eu-west"]
+transports = ["https", "grpc"]
+description = "Multi-region plan"
+
+[enterprise.limits]
+projects = 100
+storageGb = 1000
+
+[[enterprise.locations]]
+code = "us-east"
+primary = true
+note = "Primary production region"
+
+[[enterprise.locations]]
+code = "eu-west"
+primary = false

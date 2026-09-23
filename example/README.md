@@ -1,0 +1,81 @@
+# dart-tomg example
+
+This runnable package declares its model targets in root `g.toml` and keeps TOML
+build inputs in `config/`, outside `lib/`. `tomgen` generates annotated models
+under `lib/generated/`, then build_runner compiles the data into Dart constants.
+The TOML files are never declared as runtime assets.
+
+It contains two focused registries:
+
+- `ApiEndpoint` demonstrates scalar fields, defaults, environment fallback,
+  TOML obfuscation metadata, generated `@Obfus` declarations, ciphertext
+  storage, and typed decoded access.
+- `ServicePlan` demonstrates enum keys, scalar and enum lists, an
+  environment-backed list item, and an optional nullable field.
+
+From the repository root:
+
+```sh
+dart pub get
+cd example
+dart run tomgen build
+dart test
+dart run bin/example.dart
+```
+
+To inspect phase one independently:
+
+```sh
+dart run tomgen generate
+dart run tomgen clean
+dart run tomgen generate
+```
+
+The root manifest contains both example targets:
+
+```toml
+version = 1
+output = "lib/generated"
+
+[targets.api_endpoints]
+source = "config/api_endpoints.toml"
+model = "ApiEndpoint"
+key = "id"
+```
+
+Defaults and enum intent are declared in the remaining target tables in
+[`g.toml`](g.toml).
+
+The generated annotation uses an `asset:` URI because the TOML is outside
+`lib/`:
+
+```dart
+@TomgRegistry(
+  'asset:dart_tomg_example/config/service_plans.toml',
+  key: 'tier',
+)
+```
+
+The API endpoint TOML declares obfuscation next to its data:
+
+```toml
+[__tomg]
+obfuscate = ["url"]
+```
+
+Phase one generates matching Dart `@Obfus` declarations. Phase two checks that
+agreement, excludes metadata from the registry, stores ciphertext in
+`endpoint.url`, and exposes the original value through `endpoint.deobf.url`.
+
+The consumer's `build.yaml` makes external TOML visible to build_runner:
+
+```yaml
+targets:
+  $default:
+    sources:
+      - $package$
+      - lib/**
+      - bin/**
+      - test/**
+      - config/**
+```

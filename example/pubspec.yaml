@@ -1,0 +1,20 @@
+name: dart_tomg_example
+description: >-
+  Runnable examples for typed const Dart registries generated from TOML files
+  kept outside lib, including environment values, enums, lists, and obfuscation.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+resolution: workspace
+
+dependencies:
+  tomg: ^0.1.0
+
+dev_dependencies:
+  build_runner: ^2.16.1
+  lints: ^6.0.0
+  test: ^1.25.6
+  tomgen: ^0.1.0

@@ -1,0 +1,24 @@
+version = 1
+output = "lib/generated"
+
+[targets.api_endpoints]
+source = "config/api_endpoints.toml"
+model = "ApiEndpoint"
+key = "id"
+
+[targets.api_endpoints.defaults]
+visible = true
+enabled = true
+
+[targets.service_plans]
+source = "config/service_plans.toml"
+model = "ServicePlan"
+key = "tier"
+
+[targets.service_plans.enums.tier]
+name = "PlanTier"
+values = ["starter", "enterprise"]
+
+[targets.service_plans.enums.transports]
+name = "Transport"
+values = ["https", "grpc"]
