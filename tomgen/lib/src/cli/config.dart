@@ -82,6 +82,8 @@ const Set<String> _dartKeywords = <String>{
 bool isDartIdentifier(String value) =>
     _identifierPattern.hasMatch(value) && !_dartKeywords.contains(value);
 
+bool isTomgenTargetName(String value) => _targetPattern.hasMatch(value);
+
 /// A validated version-1 `g.toml` manifest.
 final class TomgenConfig {
   TomgenConfig({
@@ -143,7 +145,7 @@ final class TomgenConfig {
     final targets = <TomgenTarget>[];
     for (final entry in rawTargets.entries) {
       final name = entry.key;
-      if (name is! String || !_targetPattern.hasMatch(name)) {
+      if (name is! String || !isTomgenTargetName(name)) {
         throw TomgenException(
           'Invalid target name "$name" in ${manifest.path}.',
         );

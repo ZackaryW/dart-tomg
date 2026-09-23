@@ -5,6 +5,22 @@ build inputs in `config/`, outside `lib/`. `tomgen` generates annotated models
 under `lib/generated/`, then build_runner compiles the data into Dart constants.
 The TOML files are never declared as runtime assets.
 
+The checked-in package is the expanded, multi-target form of the initializer
+workflow. In a clean package, the first target can be prepared with:
+
+```sh
+dart run tomgen init \
+  --source config/api_endpoints.toml \
+  --target api_endpoints \
+  --model ApiEndpoint \
+  --key id
+```
+
+This example then adds `service_plans` plus defaults, enums, and obfuscation
+metadata directly in `g.toml` and the TOML files. Running `tomgen init` against
+the completed example intentionally reports a conflict because initialization
+does not merge into an established manifest.
+
 It contains two focused registries:
 
 - `ApiEndpoint` demonstrates scalar fields, defaults, environment fallback,
@@ -67,7 +83,9 @@ Phase one generates matching Dart `@Obfus` declarations. Phase two checks that
 agreement, excludes metadata from the registry, stores ciphertext in
 `endpoint.url`, and exposes the original value through `endpoint.deobf.url`.
 
-The consumer's `build.yaml` makes external TOML visible to build_runner:
+The consumer's `build.yaml` makes external TOML visible to build_runner. The
+initializer adds the selected file automatically; this example widens that
+entry to `config/**` for both targets:
 
 ```yaml
 targets:

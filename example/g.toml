@@ -1,6 +1,8 @@
 version = 1
 output = "lib/generated"
 
+# Multi-target expansion of the first target that `tomgen init` can create.
+
 [targets.api_endpoints]
 source = "config/api_endpoints.toml"
 model = "ApiEndpoint"

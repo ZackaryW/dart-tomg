@@ -1,3 +1,9 @@
+## Unreleased
+
+- Add safe, idempotent `tomgen init` scaffolding for a starter registry or an
+  existing TOML source, including dependency diagnostics, external build input
+  configuration, conflict preflight, and rollback-capable file updates.
+
 ## 0.1.0
 
 Initial release.

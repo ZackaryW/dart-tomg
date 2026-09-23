@@ -17,16 +17,57 @@ dependencies:
   tomg: ^0.1.0
 
 dev_dependencies:
-  build_runner: ^2.9.0
+  build_runner: ^2.16.1
   tomgen: ^0.1.0
 ```
 
-No `build.yaml` is required in your package: `tomgen`'s own `build.yaml`
-declares `auto_apply: dependents`, so depending on it is enough.
+`tomgen`'s builder applies automatically. A package-level `build.yaml` is only
+needed when a TOML source outside `lib/` must be added to the build graph.
+
+## Initialize a package
+
+After adding the dependencies, create a complete starter configuration:
+
+```sh
+dart run tomgen init
+```
+
+This creates:
+
+- `g.toml` with an `items` target and `lib/generated` output
+- `config/items.toml` with one usable row keyed by `id`
+- `build.yaml` coverage for the external TOML source
+
+The command only prepares inputs. It does not run generation, edit
+`pubspec.yaml`, declare Flutter assets, or create an ownership manifest. A
+second identical invocation is a no-op and reports the reused files.
+
+To initialize from an existing TOML source:
+
+```sh
+dart run tomgen init \
+  --source config/api_endpoints.toml \
+  --target api_endpoints \
+  --model ApiEndpoint \
+  --key id \
+  --output lib/generated
+```
+
+`--source`, `--target`, `--model`, and `--key` must be supplied together;
+`--output` defaults to `lib/generated`. The command validates dependency
+placement, package-contained paths, target and Dart identifiers, TOML model
+inference, build input coverage, and every destination before writing. Missing
+dependencies produce exact `dart pub add` commands. Existing matching files are
+reused, while conflicting files stop the operation without partial changes.
+
+The initializer creates one target. Add more targets, defaults, enums, or
+obfuscation metadata by editing the strict version-1 manifest and TOML directly
+as described below.
 
 ## Generate models from TOML
 
-Create `g.toml` beside `pubspec.yaml`:
+For manual setup or additional targets, create or edit `g.toml` beside
+`pubspec.yaml`:
 
 ```toml
 version = 1
@@ -125,7 +166,8 @@ obfuscation targets fail with target, table, and complete field-path context.
 ### TOML outside lib
 
 For sources such as `config/api_endpoints.toml`, make the directory visible to
-build_runner without declaring it as a runtime asset:
+build_runner without declaring it as a runtime asset. `tomgen init` handles its
+selected source automatically; the equivalent manual configuration is:
 
 ```yaml
 targets:

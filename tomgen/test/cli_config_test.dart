@@ -30,6 +30,29 @@ void main() {
       expect(build.forwardedArguments, <String>[
         '--delete-conflicting-outputs',
       ]);
+      final starter = TomgenInvocation.parse(<String>['init']);
+      expect(starter.command, TomgenCommand.init);
+      expect(starter.initRequest!.source, 'config/items.toml');
+      expect(starter.initRequest!.createStarterSource, isTrue);
+
+      final custom = TomgenInvocation.parse(<String>[
+        'init',
+        '--source',
+        'config/services.toml',
+        '--target=services',
+        '--model',
+        'Service',
+        '--key',
+        'id',
+        '--output',
+        'lib/config',
+      ]).initRequest!;
+      expect(custom.source, 'config/services.toml');
+      expect(custom.target, 'services');
+      expect(custom.model, 'Service');
+      expect(custom.key, 'id');
+      expect(custom.output, 'lib/config');
+      expect(custom.createStarterSource, isFalse);
     });
 
     test('rejects unknown commands and misplaced forwarded arguments', () {
@@ -41,7 +64,68 @@ void main() {
         () => TomgenInvocation.parse(<String>['generate', '--', 'extra']),
         throwsA(isA<TomgenException>()),
       );
+      expect(
+        () => TomgenInvocation.parse(<String>['init', '--', 'extra']),
+        throwsA(isA<TomgenException>()),
+      );
+      expect(
+        () => TomgenInvocation.parse(<String>['init', 'extra']),
+        throwsA(isA<TomgenException>()),
+      );
+      expect(
+        () => TomgenInvocation.parse(<String>['init', '--wat', 'value']),
+        throwsA(isA<TomgenException>()),
+      );
+      expect(
+        () => TomgenInvocation.parse(<String>[
+          'init',
+          '--source=a.toml',
+          '--source=b.toml',
+          '--target=x',
+          '--model=X',
+          '--key=id',
+        ]),
+        throwsA(isA<TomgenException>()),
+      );
+      for (final omitted in <String>['source', 'target', 'model', 'key']) {
+        final arguments = <String>['init'];
+        final values = <String, String>{
+          'source': 'config/x.toml',
+          'target': 'x',
+          'model': 'X',
+          'key': 'id',
+        };
+        for (final entry in values.entries) {
+          if (entry.key != omitted) {
+            arguments.add('--${entry.key}=${entry.value}');
+          }
+        }
+        expect(
+          () => TomgenInvocation.parse(arguments),
+          throwsA(isA<TomgenException>()),
+          reason: 'missing --$omitted',
+        );
+      }
+      expect(
+        TomgenInvocation.parse(<String>['init', '--help']).command,
+        TomgenCommand.help,
+      );
     });
+  });
+
+  test('shared name validators match manifest rules', () {
+    for (final valid in <String>['items', 'api_endpoints', 'x1']) {
+      expect(isTomgenTargetName(valid), isTrue, reason: valid);
+    }
+    for (final invalid in <String>['Items', 'api-endpoints', '_items', '']) {
+      expect(isTomgenTargetName(invalid), isFalse, reason: invalid);
+    }
+    for (final valid in <String>['Item', 'id', r'$value', '_private']) {
+      expect(isDartIdentifier(valid), isTrue, reason: valid);
+    }
+    for (final invalid in <String>['class', 'two words', '1item', '']) {
+      expect(isDartIdentifier(invalid), isFalse, reason: invalid);
+    }
   });
 
   group('package discovery', () {
