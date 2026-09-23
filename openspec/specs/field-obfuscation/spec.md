@@ -91,9 +91,11 @@ required to be a compile-time constant.
 
 ### Requirement: Obfuscation rejects enum and collection fields
 
-The generator SHALL reject `@Obfus` on enum and collection fields because the
-runtime codec and decoded companion contract support scalar strings and numbers
-only.
+The generator SHALL reject `@Obfus` on enum, collection, or object-valued
+fields because the runtime codec and decoded companion contract support scalar
+strings and numbers only. It SHALL also reject `@Obfus` on fields declared
+inside a nested model because that model has no independent decoded-companion
+contract.
 
 #### Scenario: Obfuscated enum is rejected
 
@@ -106,6 +108,19 @@ only.
 - **WHEN** a `List<T>` field is marked `@Obfus`
 - **THEN** generation fails with an error identifying the field path, collection
   type, and unsupported obfuscation
+
+#### Scenario: Obfuscated object is rejected
+
+- **WHEN** a custom-model field is marked `@Obfus`
+- **THEN** generation fails with an error identifying the field path, model type,
+  and unsupported obfuscation
+
+#### Scenario: Obfuscation inside nested model is rejected
+
+- **WHEN** a constructor-bound field inside a reachable nested model is marked
+  `@Obfus`
+- **THEN** generation fails before registry output with the complete path from
+  the root model to the annotated nested field
 
 ### Requirement: TOML obfuscation declaration agrees with Dart
 
@@ -153,3 +168,16 @@ obfuscation independently of the Dart annotations.
 - **WHEN** the TOML document has no `__tomg` table
 - **THEN** Dart `@Obfus` annotations remain authoritative and generation behaves
   as it did before TOML metadata support
+
+### Requirement: Environment values are resolved before obfuscation
+
+For a field marked as obfuscated whose TOML value is an environment reference,
+the generator SHALL resolve and convert the environment value first, then encode
+that resolved value with the field's normal codec.
+
+#### Scenario: Obfuscated environment-backed string
+
+- **WHEN** an `@Obfus` string field contains `$SECRET_VALUE` and the variable
+  is present
+- **THEN** the generated constant contains ciphertext for the resolved value,
+  and contains neither the resolved plaintext nor `$SECRET_VALUE`
