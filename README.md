@@ -9,7 +9,42 @@ as TOML but should ship as typed Dart objects without runtime file I/O.
 ## TOML-first workflow
 
 Add `tomg` as a dependency and `tomgen` plus `build_runner` as development
-dependencies. At the package root, declare generated models in `g.toml`:
+dependencies:
+
+```sh
+dart pub add tomg
+dart pub add --dev tomgen build_runner
+```
+
+For a working starter target, initialize and build from anywhere inside the
+package:
+
+```sh
+dart run tomgen init
+dart run tomgen build
+```
+
+`init` creates `g.toml`, `config/items.toml`, and the external TOML entry in
+`build.yaml`. It never adds runtime assets, changes dependencies, generates Dart
+files, or overwrites conflicting files. Running the same command again reuses
+the initialized files without rewriting them.
+
+To initialize an existing TOML source instead, provide the complete target
+contract:
+
+```sh
+dart run tomgen init \
+  --source config/api_endpoints.toml \
+  --target api_endpoints \
+  --model ApiEndpoint \
+  --key id
+```
+
+`--output` optionally replaces the default `lib/generated`. The source must
+already exist, and the output must remain beneath `lib/`.
+
+For multiple targets or defaults and enums, edit the versioned root `g.toml`
+directly:
 
 ```toml
 version = 1
@@ -73,7 +108,8 @@ A structural TOML edit changes the generated Dart API on the next run. Commit
 and review the generated Dart diff when consumers need an API review boundary.
 
 TOML under a root directory such as `config/` remains outside `lib/` and is not
-a runtime asset. Include that directory in the package build graph:
+a runtime asset. `tomgen init` adds an exact source entry automatically. For a
+manual setup, include the directory in the package build graph:
 
 ```yaml
 targets:
@@ -151,6 +187,9 @@ obfuscation by itself. Files without this table keep the Dart-only behavior.
 - [`example`](example/) is a runnable package that keeps TOML in an external
   `config/` directory, adds it to the build graph, and verifies the generated
   registries with integration tests.
+- [`ci_test`](ci_test/) is a non-published workspace package that builds
+  isolated starter and custom initializer consumers and validates the GitHub
+  Actions contract.
 
 See the [tomgen setup guide](tomgen/README.md) for complete installation and
 usage instructions.
@@ -236,14 +275,22 @@ The repository is a Pub workspace. From its root:
 
 ```sh
 dart pub get
+dart format --output=none --set-exit-if-changed .
 dart analyze
 dart test tomg
 dart test tomgen
-dart run build_runner build --workspace
-dart test example
+dart test ci_test
+cd example
+dart run tomgen build
+dart test
+cd ..
+git diff --exit-code -- example/lib/generated
+dart pub -C tomg publish --dry-run
+dart pub -C tomgen publish --dry-run
 ```
 
-See [PUBLISHING.md](PUBLISHING.md) for package dry runs and the required
+GitHub Actions runs the same gates on Dart 3.12.2 and the current stable SDK.
+See [PUBLISHING.md](PUBLISHING.md) for failure reproduction and the required
 `tomg`-before-`tomgen` release order.
 
 ## License

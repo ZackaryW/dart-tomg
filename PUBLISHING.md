@@ -16,24 +16,40 @@ local `tomg` package during development. No manifest rewriting is required.
 
 ## Validate the workspace
 
-From the repository root:
+GitHub Actions runs this sequence on the minimum supported Dart SDK (`3.12.2`)
+and the current stable SDK. From a clean repository checkout, run the same gates
+from the repository root:
 
 ```
 dart pub get
+dart format --output=none --set-exit-if-changed .
 dart analyze
 dart test tomg
 dart test tomgen
-dart run build_runner build --workspace
-dart test example
+dart test ci_test
+cd example
+dart run tomgen build
+dart test
+cd ..
+git diff --exit-code -- example/lib/generated
+dart pub -C tomg publish --dry-run
+dart pub -C tomgen publish --dry-run
 ```
 
-Then inspect the working tree. Publishing warns about uncommitted files, so
-perform release dry runs from the exact commit intended for release.
+The `ci_test/` package creates isolated consumers for starter and custom
+`tomgen init` builds and verifies the CI workflow contract itself. The generated
+diff gate proves the checked-in example matches its TOML inputs. Publication
+warnings fail CI; do not use `--ignore-warnings` or `--skip-validation`.
+
+Then inspect the complete working tree. Publishing warns about uncommitted
+files, so perform release dry runs from the exact commit intended for release.
 
 ## 1. Publish `tomg`
 
+`dart pub -C tomg publish --dry-run` is already part of validation. Publish only
+after every gate passes:
+
 ```
-dart pub -C tomg publish --dry-run
 dart pub -C tomg publish
 ```
 
@@ -41,8 +57,10 @@ dart pub -C tomg publish
 
 Wait until pub.dev can resolve the new `tomg` version, then:
 
+`dart pub -C tomgen publish --dry-run` is already part of validation. After the
+new `tomg` version is available:
+
 ```
-dart pub -C tomgen publish --dry-run
 dart pub -C tomgen publish
 ```
 

@@ -8,3 +8,4 @@ workspace:
   - tomg
   - tomgen
   - example
+  - ci_test
