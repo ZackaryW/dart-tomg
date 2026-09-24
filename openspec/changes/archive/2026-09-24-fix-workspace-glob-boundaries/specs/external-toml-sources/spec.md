@@ -1,12 +1,6 @@
-# external-toml-sources Specification
+# Spec Delta
 
-## Purpose
-
-Allow TOML-first packages in a pub workspace to compile shared, committed TOML
-sources outside the package while preserving bounded filesystem access,
-deterministic generation, and fresh-clone reproducibility.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: External sources are bounded by the enclosing pub workspace
 
@@ -57,31 +51,11 @@ SHALL remain the source boundary.
   outside its package
 - **THEN** phase one rejects the source under the existing package-only rule
 
-### Requirement: External source content is digest-pinned between phases
-
-For an accepted external source, phase one SHALL emit the normalized
-package-root-relative source path and a digest of the exact source bytes in the
-generated registry annotation. The digest SHALL use the form
-`sha256:<64 lowercase hexadecimal characters>`. Editing the external source and
-rerunning phase one SHALL update the generated annotation.
-
-#### Scenario: Phase one emits an external source digest
-
-- **WHEN** phase one generates a model from an accepted external TOML source
-- **THEN** its registry annotation contains the package-root-relative source and
-  the SHA-256 digest of that source's exact bytes
-
-#### Scenario: External source content changes
-
-- **WHEN** an external TOML source changes and phase one runs again
-- **THEN** the generated annotation contains the new digest and is treated as a
-  normal owned-file content update
-
 ### Requirement: Phase two verifies external sources before generation
 
 When a registry annotation carries an external-source digest, phase two SHALL
-resolve the source from the annotated package root, enforce the same explicit or
-glob-selected workspace boundary as phase one, read it directly from the
+resolve the source from the annotated package root, enforce the same explicit
+or glob-selected workspace boundary as phase one, read it directly from the
 filesystem, and verify its digest before parsing. A missing source, malformed
 digest, boundary violation, or digest mismatch SHALL fail without partial output
 and SHALL instruct the user to rerun `dart run tomgen build`. An external source
@@ -119,42 +93,3 @@ without a digest SHALL be rejected.
 
 - **WHEN** an annotation names a source outside the package without a digest
 - **THEN** phase two rejects the unpinned filesystem read
-
-### Requirement: Existing package-local source behavior remains compatible
-
-Package-local TOML-first targets SHALL retain their current annotation source,
-build-runner asset reads, and generated output without emitting a digest.
-Existing model-first annotations that omit the optional digest SHALL retain
-their current API and behavior.
-
-#### Scenario: Package-local target is regenerated
-
-- **WHEN** phase one processes an existing package-local target
-- **THEN** its generated model is byte-identical to the pre-change output and
-  its annotation contains no digest
-
-#### Scenario: Existing model-first annotation omits digest
-
-- **WHEN** build_runner processes an existing registry annotation created with
-  only a source and key
-- **THEN** phase two resolves and reads the source through the existing build
-  asset path
-
-### Requirement: Checked-in external sources support fresh-clone builds
-
-A committed external TOML source and its committed digest-bearing generated
-model SHALL allow phase two to run through plain build_runner without a phase-one
-rerun. Editing an external source SHALL require `tomgen build` to refresh the
-digest before the change can be compiled.
-
-#### Scenario: Fresh clone runs build_runner directly
-
-- **WHEN** a fresh checkout contains the committed external TOML and matching
-  generated model but no prior local generation state
-- **THEN** plain build_runner generation succeeds
-
-#### Scenario: User edits external TOML
-
-- **WHEN** a user changes an external TOML source
-- **THEN** running `tomgen build` refreshes the generated model digest before
-  invoking phase two
