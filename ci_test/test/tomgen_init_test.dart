@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -102,7 +103,7 @@ dependency_overrides:
 
       await _verifyWorkspaceExternalSource(workspace);
     },
-    timeout: const Timeout(Duration(minutes: 4)),
+    timeout: const Timeout(Duration(minutes: 6)),
   );
 }
 
@@ -119,14 +120,19 @@ Future<void> _verifyWorkspaceExternalSource(Directory repository) async {
     p.join(consumer.path, 'lib', 'generated'),
   ).createSync(recursive: true);
   Directory(p.join(consumer.path, 'bin')).createSync();
-  File(p.join(workspace.path, 'pubspec.yaml')).writeAsStringSync('''
+  final workspacePubspec = File(p.join(workspace.path, 'pubspec.yaml'));
+  void writeWorkspaceMember(String member) {
+    workspacePubspec.writeAsStringSync('''
 name: external_source_workspace
 publish_to: none
 environment:
   sdk: ^3.12.2
 workspace:
-  - apps/consumer
+  - $member
 ''');
+  }
+
+  writeWorkspaceMember('apps/*');
   File(p.join(consumer.path, 'pubspec.yaml')).writeAsStringSync('''
 name: external_source_consumer
 environment:
@@ -199,6 +205,91 @@ void main() {
   await _run(consumer, <String>['run', 'build_runner', 'build']);
   expect(registry.existsSync(), isTrue);
 
+  await _run(consumer, <String>['run', 'build_runner', 'clean']);
+  if (registry.existsSync()) registry.deleteSync();
+  writeWorkspaceMember('tools/*');
+  final repositoryPackages = p.join(
+    repository.path,
+    '.dart_tool',
+    'package_config.json',
+  );
+  final nonmatchingPhaseOne = await _runFailure(consumer, <String>[
+    '--packages=$repositoryPackages',
+    p.join(repository.path, 'tomgen', 'bin', 'tomgen.dart'),
+    'generate',
+  ]);
+  expect(
+    '${nonmatchingPhaseOne.stdout}\n${nonmatchingPhaseOne.stderr}',
+    contains('escapes'),
+  );
+  expect(model.readAsStringSync(), generatedModel);
+  final workspacePackages = File(
+    p.join(workspace.path, '.dart_tool', 'package_config.json'),
+  );
+  final nonmatchingPhaseTwo = await _runFailure(consumer, <String>[
+    '--packages=${workspacePackages.path}',
+    _packageScript(workspacePackages, 'build_runner', 'bin/build_runner.dart'),
+    'build',
+  ]);
+  expect(
+    '${nonmatchingPhaseTwo.stdout}\n${nonmatchingPhaseTwo.stderr}',
+    allOf(contains('escapes'), contains('dart run tomgen build')),
+  );
+  expect(registry.existsSync(), isFalse);
+
+  writeWorkspaceMember('apps/*');
+  final outside = File(
+    p.join(
+      Directory.systemTemp.path,
+      'tomgen_outside_${workspace.hashCode}.toml',
+    ),
+  )..writeAsStringSync(originalSource);
+  addTearDown(() {
+    if (outside.existsSync()) outside.deleteSync();
+  });
+  final escape = Link(p.join(workspace.path, 'config', 'escape.toml'));
+  escape.createSync(outside.path);
+  final manifest = File(p.join(consumer.path, 'g.toml'));
+  final originalManifest = manifest.readAsStringSync();
+  manifest.writeAsStringSync(
+    originalManifest.replaceFirst(
+      '../../config/tenants.toml',
+      '../../config/escape.toml',
+    ),
+  );
+  final linkedPhaseOne = await _runFailure(consumer, <String>[
+    'run',
+    'tomgen',
+    'generate',
+  ]);
+  expect(
+    '${linkedPhaseOne.stdout}\n${linkedPhaseOne.stderr}',
+    allOf(contains('escapes'), contains('through a link')),
+  );
+  expect(model.readAsStringSync(), generatedModel);
+  model.writeAsStringSync(
+    generatedModel.replaceFirst(
+      '"../../config/tenants.toml"',
+      '"../../config/escape.toml"',
+    ),
+  );
+  final linkedPhaseTwo = await _runFailure(consumer, <String>[
+    'run',
+    'build_runner',
+    'build',
+  ]);
+  expect(
+    '${linkedPhaseTwo.stdout}\n${linkedPhaseTwo.stderr}',
+    allOf(
+      contains('escapes'),
+      contains('through a link'),
+      contains('dart run tomgen build'),
+    ),
+  );
+  expect(registry.existsSync(), isFalse);
+  manifest.writeAsStringSync(originalManifest);
+  model.writeAsStringSync(generatedModel);
+
   source.writeAsStringSync(originalSource.replaceFirst('Primary', 'Changed'));
   await _run(consumer, <String>['run', 'build_runner', 'clean']);
   final stale = await _runFailure(consumer, <String>[
@@ -230,15 +321,6 @@ void main() {
   source.writeAsStringSync(originalSource);
   await _run(consumer, <String>['run', 'tomgen', 'generate']);
   final refreshedModel = model.readAsStringSync();
-  final outside = File(
-    p.join(
-      Directory.systemTemp.path,
-      'tomgen_outside_${workspace.hashCode}.toml',
-    ),
-  )..writeAsStringSync(originalSource);
-  addTearDown(() {
-    if (outside.existsSync()) outside.deleteSync();
-  });
   final outsideRelative = p
       .relative(outside.path, from: consumer.path)
       .replaceAll('\\', '/');
@@ -304,6 +386,22 @@ Future<ProcessResult> _runFailure(
     fail('${arguments.join(' ')} unexpectedly succeeded.');
   }
   return result;
+}
+
+String _packageScript(
+  File packageConfig,
+  String packageName,
+  String relativePath,
+) {
+  final document = jsonDecode(packageConfig.readAsStringSync()) as Map;
+  final packages = document['packages'] as List;
+  final entry = packages.cast<Map>().singleWhere(
+    (candidate) => candidate['name'] == packageName,
+  );
+  final root = Directory.fromUri(
+    packageConfig.uri.resolve(entry['rootUri'] as String),
+  );
+  return p.join(root.path, relativePath);
 }
 
 final class _Fixture {

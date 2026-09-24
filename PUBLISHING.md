@@ -1,7 +1,7 @@
 # Publishing tomg and tomgen
 
-This repo holds two packages that must be published **in order**, because
-`tomgen` depends on `tomg`:
+This repo holds two packages. When both advance, they must be published **in
+order**, because `tomgen` depends on `tomg`:
 
 ```
   tomg (no deps on tomgen)  -->  publish first
@@ -74,34 +74,21 @@ cd ..
 git diff --exit-code -- example/lib/generated
 ```
 
-The expected 0.2.0 baseline is 106 tomgen tests, 3 isolated-consumer tests, 9
+The expected 0.2.1 baseline is 107 tomgen tests, 3 isolated-consumer tests, 9
 example tests, and no generated example diff. Remove the scratch directory
 after inspection.
 
-## Releasing 0.2.0
+## Releasing tomgen 0.2.1
 
-Version 0.2.0 adds the optional runtime digest annotation and the generator
-behavior that consumes it, so both packages advance together. Complete the
-default and lowest-bounds gates, then publish `tomg` 0.2.0 first. Wait until
-pub.dev resolves it before publishing `tomgen` 0.2.0.
+Version 0.2.1 fixes workspace boundary discovery for glob members such as
+`apps/*`. It changes only the generator package; `tomg` remains at 0.2.0 and
+already satisfies tomgen's hosted dependency constraint. Complete the default
+and lowest-bounds gates, then publish `tomgen` 0.2.1.
 
-## 1. Publish `tomg`
+The publication dry run is already part of validation. Publish only after every
+gate passes:
 
-`dart pub -C tomg publish --dry-run` is already part of validation. Publish only
-after every gate passes:
-
-```
-dart pub -C tomg publish
-```
-
-## 2. Publish `tomgen` after `tomg` is available
-
-Wait until pub.dev can resolve the new `tomg` version, then:
-
-`dart pub -C tomgen publish --dry-run` is already part of validation. After the
-new `tomg` version is available:
-
-```
+```sh
 dart pub -C tomgen publish
 ```
 

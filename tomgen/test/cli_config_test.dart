@@ -165,6 +165,78 @@ void main() {
       );
     });
 
+    test('matches literal and glob workspace members only', () {
+      final workspace = Directory.systemTemp.createTempSync(
+        'tomgen_workspace_members_',
+      );
+      final outside = Directory.systemTemp.createTempSync(
+        'tomgen_workspace_member_outside_',
+      );
+      addTearDown(() {
+        if (workspace.existsSync()) workspace.deleteSync(recursive: true);
+        if (outside.existsSync()) outside.deleteSync(recursive: true);
+      });
+      final app = Directory(p.join(workspace.path, 'packages', 'app'))
+        ..createSync(recursive: true);
+      File(p.join(app.path, 'pubspec.yaml')).writeAsStringSync('''
+name: workspace_app
+environment:
+  sdk: ^3.12.2
+''');
+      final workspacePubspec = File(p.join(workspace.path, 'pubspec.yaml'));
+
+      void writeMembers(List<String> members) {
+        final memberLines = members
+            .map((member) => "  - '${member.replaceAll("'", "''")}'")
+            .join('\n');
+        workspacePubspec.writeAsStringSync('''
+name: enclosing_workspace
+publish_to: none
+environment:
+  sdk: ^3.12.2
+workspace:
+$memberLines
+''');
+      }
+
+      for (final member in <String>['packages/app', 'packages/*']) {
+        writeMembers(<String>[member]);
+        expect(
+          TomgenProject.discover(app).sourceBoundary.path,
+          workspace.resolveSymbolicLinksSync(),
+          reason: member,
+        );
+      }
+
+      for (final members in <List<String>>[
+        <String>['apps/*'],
+        <String>['packages/['],
+        <String>[p.join(workspace.path, 'packages', '*')],
+        <String>[r'C:\packages\*'],
+      ]) {
+        writeMembers(members);
+        expect(
+          TomgenProject.discover(app).sourceBoundary.path,
+          app.resolveSymbolicLinksSync(),
+          reason: members.single,
+        );
+      }
+
+      final externalApp = Directory(p.join(outside.path, 'app'))..createSync();
+      File(p.join(externalApp.path, 'pubspec.yaml')).writeAsStringSync('''
+name: linked_app
+environment:
+  sdk: ^3.12.2
+''');
+      writeMembers(<String>['packages/*']);
+      final link = Link(p.join(workspace.path, 'packages', 'linked'));
+      link.createSync(externalApp.path);
+      expect(
+        TomgenProject.discover(Directory(link.path)).sourceBoundary.path,
+        externalApp.resolveSymbolicLinksSync(),
+      );
+    });
+
     test('package configuration mapping verifies the requested identity', () {
       final root = Directory.systemTemp.createTempSync('tomgen_package_map_');
       addTearDown(() => root.deleteSync(recursive: true));

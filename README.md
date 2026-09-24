@@ -131,7 +131,8 @@ clone.
 ### TOML shared from a pub workspace
 
 A workspace package may reference committed TOML outside the package but inside
-its nearest enclosing pub workspace. For example, with the consumer at
+its nearest enclosing pub workspace. Both literal workspace members and glob
+members such as `apps/*` are supported. For example, with the consumer at
 `apps/consumer` and shared data at `config/tenants.toml`:
 
 ```toml

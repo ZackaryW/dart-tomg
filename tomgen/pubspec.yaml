@@ -3,7 +3,7 @@ description: >-
   TOML-first CLI and build_runner generator for dart-tomg: generates typed
   model libraries and compiles build-input TOML into const Dart registries,
   including optional field obfuscation. A dev_dependency in consuming packages.
-version: 0.2.0
+version: 0.2.1
 repository: https://github.com/ZackaryW/dart-tomg/tree/main/tomgen
 issue_tracker: https://github.com/ZackaryW/dart-tomg/issues
 topics:

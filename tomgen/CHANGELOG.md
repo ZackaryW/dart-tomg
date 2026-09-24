@@ -1,3 +1,10 @@
+## 0.2.1
+
+- Recognize pub workspace glob members such as `apps/*` when bounding shared
+  external TOML sources in both CLI generation and build_runner generation.
+- Preserve package-only boundaries for nonmatching, invalid, absolute, and
+  symlink-escaping workspace declarations.
+
 ## 0.2.0
 
 - Widen analyzer, source_gen, and dart_style ranges to their verified lower

@@ -18,7 +18,7 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.16.1
-  tomgen: ^0.2.0
+  tomgen: ^0.2.1
 ```
 
 `tomgen`'s builder applies automatically. A package-level `build.yaml` is only
@@ -186,7 +186,9 @@ TOML into `lib/`.
 ### TOML outside the package
 
 A package inside a pub workspace may share committed TOML from elsewhere under
-the nearest enclosing workspace root. Given this layout:
+the nearest enclosing workspace root. Workspace membership may use either a
+literal path such as `apps/consumer` or a supported glob such as `apps/*`.
+Given this layout:
 
 ```text
 workspace/

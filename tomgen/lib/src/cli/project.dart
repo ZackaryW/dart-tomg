@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:glob/glob.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
@@ -68,13 +69,19 @@ Directory discoverSourceBoundary(Directory packageRoot) {
     if (pubspec.existsSync()) {
       final workspace = _readPubspec(pubspec)['workspace'];
       if (workspace is YamlList) {
-        for (final member in workspace) {
-          if (member is! String || p.isAbsolute(member)) continue;
-          final memberPath = _resolveThroughExistingAncestor(
-            p.normalize(p.join(directory.path, member)),
+        final canonicalWorkspace = Directory(
+          directory.resolveSymbolicLinksSync(),
+        );
+        if (p.isWithin(canonicalWorkspace.path, canonicalPackage.path)) {
+          final relativePackage = p.posix.joinAll(
+            p.split(
+              p.relative(canonicalPackage.path, from: canonicalWorkspace.path),
+            ),
           );
-          if (p.equals(memberPath, canonicalPackage.path)) {
-            return Directory(directory.resolveSymbolicLinksSync());
+          for (final member in workspace) {
+            if (_matchesWorkspaceMember(member, relativePackage)) {
+              return canonicalWorkspace;
+            }
           }
         }
       }
@@ -82,6 +89,22 @@ Directory discoverSourceBoundary(Directory packageRoot) {
     final parent = directory.parent;
     if (p.equals(parent.path, directory.path)) return canonicalPackage;
     directory = parent;
+  }
+}
+
+bool _matchesWorkspaceMember(Object? member, String relativePackage) {
+  if (member is! String ||
+      p.posix.isAbsolute(member) ||
+      p.windows.isAbsolute(member)) {
+    return false;
+  }
+  try {
+    return Glob(
+      p.posix.normalize(member),
+      context: p.posix,
+    ).matches(relativePackage);
+  } on FormatException {
+    return false;
   }
 }
 
