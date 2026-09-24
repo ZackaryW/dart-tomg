@@ -18,7 +18,11 @@ final class TomgenEmitter {
 
   final DartFormatter _formatter;
 
-  String emit(TomgenSchema schema, {required String packageName}) {
+  String emit(
+    TomgenSchema schema, {
+    required String packageName,
+    String? sourceDigest,
+  }) {
     final target = schema.target;
     final model = target.model;
     final obfuscated = schema.fields
@@ -44,9 +48,21 @@ final class TomgenEmitter {
     }
 
     final source = target.sourceRelative.replaceAll('\\', '/');
-    buffer.writeln(
-      "@TomgRegistry('asset:$packageName/$source', key: '${target.key}')",
-    );
+    if (target.isExternal) {
+      if (sourceDigest == null) {
+        throw TomgenException(
+          'External source for target "${target.name}" requires a digest.',
+        );
+      }
+      buffer.writeln(
+        '@TomgRegistry(${jsonEncode(source)}, key: ${jsonEncode(target.key)}, '
+        'digest: ${jsonEncode(sourceDigest)})',
+      );
+    } else {
+      buffer.writeln(
+        "@TomgRegistry('asset:$packageName/$source', key: '${target.key}')",
+      );
+    }
     buffer.write('class $model');
     if (obfuscated.isNotEmpty) {
       buffer.write(' implements Obfuscated<${model}Deobf>');

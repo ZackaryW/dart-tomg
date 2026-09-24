@@ -11,10 +11,10 @@ environment:
 resolution: workspace
 
 dependencies:
-  tomg: ^0.1.0
+  tomg: ^0.2.0
 
 dev_dependencies:
   build_runner: ^2.16.1
   lints: ^6.0.0
   test: ^1.25.6
-  tomgen: ^0.1.0
+  tomgen: ^0.2.0

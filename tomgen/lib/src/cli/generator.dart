@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 
 import '../registry_document.dart';
 import 'config.dart';
@@ -27,10 +30,11 @@ final class TomgenGenerator {
     final config = TomgenConfig.load(project);
     final outputs = <TomgenOutput>[];
     for (final target in config.targets) {
+      final sourceBytes = target.sourceFile.readAsBytesSync();
       final TomgRegistryDocument document;
       try {
         document = TomgRegistryDocument.parse(
-          target.sourceFile.readAsStringSync(),
+          utf8.decode(sourceBytes),
           source: target.sourceRelative,
         );
       } on TomgDocumentException catch (error) {
@@ -40,7 +44,13 @@ final class TomgenGenerator {
       outputs.add(
         TomgenOutput(
           target.outputFile,
-          _emitter.emit(schema, packageName: project.packageName),
+          _emitter.emit(
+            schema,
+            packageName: project.packageName,
+            sourceDigest: target.isExternal
+                ? 'sha256:${sha256.convert(sourceBytes)}'
+                : null,
+          ),
         ),
       );
     }

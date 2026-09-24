@@ -128,6 +128,29 @@ cleanup. It will not overwrite handwritten or edited files. An identical
 checked-in generated model can be adopted without being rewritten on a fresh
 clone.
 
+### TOML shared from a pub workspace
+
+A workspace package may reference committed TOML outside the package but inside
+its nearest enclosing pub workspace. For example, with the consumer at
+`apps/consumer` and shared data at `config/tenants.toml`:
+
+```toml
+[targets.tenants]
+source = "../../config/tenants.toml"
+model = "Tenant"
+key = "code"
+```
+
+Phase one embeds the source's SHA-256 digest in the generated model. Phase two
+reads the shared file directly and rejects a missing, changed, or escaping path.
+Both lexical and symlink escapes beyond the workspace root fail; a standalone
+package retains the package-only boundary. External workspace sources do not
+need `build.yaml` coverage and are never runtime assets.
+
+Commit both the TOML and generated model. A fresh clone can run plain
+`build_runner build` using the checked-in digest. After every external TOML
+edit, run `dart run tomgen build` to refresh that digest before compiling.
+
 ## Model-first workflow
 
 The annotation-driven workflow remains available when you want to write the
@@ -268,6 +291,21 @@ obfuscate = ["url"]
 
 Only top-level constructor field names are accepted. The list is file-wide,
 order-independent, and must match the Dart `@Obfus` field set exactly.
+
+### Obfuscated registry keys
+
+A scalar registry key may also be marked `@Obfus` (or named in
+`__tomg.obfuscate` for TOML-first generation). The generated map is keyed by
+ciphertext, so encode the lookup candidate with the matching public codec:
+
+```dart
+final entry = tenantRegistry[TomgCodec.encodeString(accessCode)];
+final numeric = regionRegistry[TomgCodec.encodeInt(regionId)];
+```
+
+The decoded key remains available through `entry.deobf`. Key obfuscation is
+deterministic and reversible; it prevents simple plaintext scans but is not
+encryption or secret storage.
 
 ## Development and verification
 

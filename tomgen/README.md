@@ -14,11 +14,11 @@ In your package's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  tomg: ^0.1.0
+  tomg: ^0.2.0
 
 dev_dependencies:
   build_runner: ^2.16.1
-  tomgen: ^0.1.0
+  tomgen: ^0.2.0
 ```
 
 `tomgen`'s builder applies automatically. A package-level `build.yaml` is only
@@ -99,8 +99,8 @@ values = ["https", "grpc"]
 Each lower snake case target produces `<output>/<target>.dart`. `source` is
 package-relative, `model` is the Dart class name, and `key` selects the registry
 map key. The manifest is strict and versioned; unknown keys, invalid identifiers,
-paths outside the package, and output paths outside `lib/` fail before files
-change.
+source paths outside the allowed project boundary, and output paths outside
+`lib/` fail before files change.
 
 Run both phases:
 
@@ -163,7 +163,7 @@ Empty registries, all-empty lists without enum evidence, incompatible shapes,
 unknown hint paths, object or collection keys, nested lists, and unsupported
 obfuscation targets fail with target, table, and complete field-path context.
 
-### TOML outside lib
+### Package-local TOML outside lib
 
 For sources such as `config/api_endpoints.toml`, make the directory visible to
 build_runner without declaring it as a runtime asset. `tomgen init` handles its
@@ -182,6 +182,41 @@ targets:
 
 Phase one emits an `asset:<package>/<source>` annotation and does not copy the
 TOML into `lib/`.
+
+### TOML outside the package
+
+A package inside a pub workspace may share committed TOML from elsewhere under
+the nearest enclosing workspace root. Given this layout:
+
+```text
+workspace/
+  pubspec.yaml
+  config/tenants.toml
+  apps/consumer/
+    pubspec.yaml
+    g.toml
+```
+
+`apps/consumer/g.toml` can declare:
+
+```toml
+[targets.tenants]
+source = "../../config/tenants.toml"
+model = "Tenant"
+key = "code"
+```
+
+Phase one emits the package-root-relative path and a SHA-256 digest in the
+generated `@TomgRegistry`. Phase two reads the external file directly and
+verifies that digest before parsing. Normalized paths and resolved symlinks must
+remain inside the workspace root. Outside a pub workspace, sources remain
+package-contained.
+
+No `build.yaml` entry or Flutter runtime asset is needed for a workspace-external
+source. Commit the TOML and generated model so a fresh clone can run plain
+`build_runner build`. Because build_runner cannot watch a file outside its asset
+graph, always run `dart run tomgen build` after editing external TOML; a stale or
+missing source otherwise fails with that regeneration instruction.
 
 ### Generated-file ownership
 
@@ -276,6 +311,21 @@ The table is optional. Files without it retain Dart-only annotation behavior.
 `__tomg` is a reserved top-level table name; rename any registry entry using
 that name before upgrading. Metadata is consumed only during generation and is
 never emitted into the registry or runtime assets.
+
+### Obfuscated registry keys
+
+The registry key may be an obfuscated `String`, `int`, or supported `double`.
+The generated map uses the ciphertext as its key, so callers encode plaintext
+candidates before lookup:
+
+```dart
+final tenant = tenantRegistry[TomgCodec.encodeString(accessCode)];
+final region = regionRegistry[TomgCodec.encodeInt(regionId)];
+```
+
+The original key is available through the generated decoded companion. This is
+reversible obfuscation intended to prevent simple plaintext scans, not a secret
+store.
 
 ### Supported field types
 

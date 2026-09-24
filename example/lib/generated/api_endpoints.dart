@@ -8,7 +8,7 @@ part 'api_endpoints.g.dart';
 @TomgRegistry('asset:dart_tomg_example/config/api_endpoints.toml', key: 'id')
 class ApiEndpoint implements Obfuscated<ApiEndpointDeobf> {
   const ApiEndpoint({
-    required this.id,
+    @Obfus() required this.id,
     this.enabled = true,
     required this.environment,
     required this.name,
@@ -16,6 +16,7 @@ class ApiEndpoint implements Obfuscated<ApiEndpointDeobf> {
     this.visible = true,
   });
 
+  @Obfus()
   final String id;
 
   final bool enabled;

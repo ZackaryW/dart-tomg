@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:tomgen/src/cli/app.dart';
@@ -143,6 +144,65 @@ key = "code"
     expect(structured, contains('final AlphaDatabase database;'));
     expect(structured, isNot(equals(flat)));
     expect(File(p.join(package.root.path, 'g.lock')).existsSync(), isFalse);
+  });
+
+  test('external workspace source emits and refreshes its digest', () async {
+    final workspace = Directory.systemTemp.createTempSync('tomgen_workspace_');
+    addTearDown(() {
+      if (workspace.existsSync()) workspace.deleteSync(recursive: true);
+    });
+    final app = Directory(p.join(workspace.path, 'packages', 'app'))
+      ..createSync(recursive: true);
+    Directory(p.join(app.path, 'lib')).createSync();
+    File(p.join(workspace.path, 'pubspec.yaml')).writeAsStringSync('''
+name: enclosing_workspace
+publish_to: none
+environment:
+  sdk: ^3.12.2
+workspace:
+  - packages/app
+''');
+    File(p.join(app.path, 'pubspec.yaml')).writeAsStringSync('''
+name: workspace_app
+environment:
+  sdk: ^3.12.2
+resolution: workspace
+''');
+    final source = File(p.join(workspace.path, 'config', 'items.toml'));
+    source.parent.createSync(recursive: true);
+    source.writeAsStringSync('[one]\nid = "one"\n');
+    File(p.join(app.path, 'g.toml')).writeAsStringSync('''
+version = 1
+output = "lib/generated"
+[targets.items]
+source = "../../config/items.toml"
+model = "Item"
+key = "id"
+''');
+
+    final appRunner = TomgenApp(
+      workingDirectory: app,
+      out: StringBuffer(),
+      err: StringBuffer(),
+    );
+    expect(await appRunner.run(<String>['generate']), 0);
+    final generated = File(p.join(app.path, 'lib', 'generated', 'items.dart'));
+    final first = generated.readAsStringSync();
+    expect(first, contains('"../../config/items.toml"'));
+    expect(
+      first,
+      contains('sha256:${sha256.convert(source.readAsBytesSync())}'),
+    );
+    expect(first, isNot(contains('asset:workspace_app/../../')));
+
+    source.writeAsStringSync('[one]\nid = "changed"\n');
+    expect(await appRunner.run(<String>['generate']), 0);
+    final second = generated.readAsStringSync();
+    expect(second, isNot(equals(first)));
+    expect(
+      second,
+      contains('sha256:${sha256.convert(source.readAsBytesSync())}'),
+    );
   });
 
   test(

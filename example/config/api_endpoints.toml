@@ -2,23 +2,23 @@
 # runtime asset; tomgen embeds its values in generated Dart constants.
 
 [__tomg]
-obfuscate = ["url"]
+obfuscate = ["id", "url"]
 
-[us-east]
-id = "us-east"
+[primary-us]
+id = "code-us"
 name = "US East"
 url = "https://api.us-east.example.com"
 environment = "$TOMG_EXAMPLE_ENV_UNSET_7F3A9C2D=production"
 
-[eu-west]
-id = "eu-west"
+[primary-eu]
+id = "code-eu"
 name = "EU West"
 url = "https://api.eu-west.example.com"
 environment = "$TOMG_EXAMPLE_ENV_UNSET_7F3A9C2D=production"
 enabled = false
 
-[staging]
-id = "staging"
+[preview]
+id = "code-stage"
 name = "Staging"
 url = "https://staging.example.com"
 environment = "$TOMG_EXAMPLE_ENV_UNSET_7F3A9C2D=staging"

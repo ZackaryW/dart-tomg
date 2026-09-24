@@ -83,6 +83,141 @@ name = "Second"
     );
   });
 
+  group('obfuscated registry keys', () {
+    test(
+      'uses the ciphertext as the map key and decoded field value',
+      () async {
+        const plaintext = 'tenant-access-code';
+        const tableName = 'tenant-table-name';
+        final ciphertext = TomgCodec.encodeString(plaintext);
+        final result = await testBuilder(
+          builder,
+          _typedAssets(
+            toml:
+                '''
+[$tableName]
+code = "$plaintext"
+name = "Tenant"
+''',
+            model: '''
+@TomgRegistry('config.toml', key: 'code')
+class Entry implements Obfuscated<EntryDeobf> {
+  const Entry({@Obfus() required this.code, required this.name});
+  @Obfus()
+  final String code;
+  final String name;
+  @override
+  EntryDeobf get deobf => EntryDeobf(this);
+}
+''',
+          ),
+          rootPackage: 'tomgen',
+          generateFor: const {'tomgen|lib/model.dart'},
+          flattenOutput: true,
+        );
+
+        expect(result.succeeded, isTrue, reason: result.errors.join('\n'));
+        final output = _outputOf(result);
+        expect(output, contains('"$ciphertext": Entry('));
+        expect(output, contains('code: "$ciphertext"'));
+        expect(output, contains('String get code => _o.code.deobf;'));
+        expect(output, isNot(contains(plaintext)));
+        expect(output, isNot(contains(tableName)));
+      },
+    );
+
+    test('rejects duplicate plaintext keys before emitting output', () async {
+      final result = await testBuilder(
+        builder,
+        _typedAssets(
+          toml: '''
+[first-table]
+code = "same-code"
+name = "First"
+
+[second-table]
+code = "same-code"
+name = "Second"
+''',
+          model: '''
+@TomgRegistry('config.toml', key: 'code')
+class Entry {
+  const Entry({@Obfus() required this.code, required this.name});
+  @Obfus()
+  final String code;
+  final String name;
+}
+''',
+        ),
+        rootPackage: 'tomgen',
+        generateFor: const {'tomgen|lib/model.dart'},
+        flattenOutput: true,
+      );
+
+      expect(result.succeeded, isFalse);
+      expect(result.errors.join('\n'), contains('Duplicate registry key'));
+    });
+  });
+
+  group('external source digest validation', () {
+    for (final digest in <String>[
+      'md5:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'sha256:abc',
+      'sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    ]) {
+      test('rejects malformed digest $digest', () async {
+        final result = await testBuilder(
+          builder,
+          _typedAssets(
+            toml: '[one]\nid = "one"\n',
+            model:
+                '''
+@TomgRegistry('config.toml', key: 'id', digest: '$digest')
+class Entry {
+  const Entry({required this.id});
+  final String id;
+}
+''',
+          ),
+          rootPackage: 'tomgen',
+          generateFor: const {'tomgen|lib/model.dart'},
+          flattenOutput: true,
+        );
+
+        expect(result.succeeded, isFalse);
+        expect(
+          result.errors.join('\n'),
+          allOf(contains('malformed digest'), contains('sha256')),
+        );
+      });
+    }
+
+    test('rejects an unpinned path that escapes the package', () async {
+      final result = await testBuilder(
+        builder,
+        _typedAssets(
+          toml: '[one]\nid = "one"\n',
+          model: '''
+@TomgRegistry('../../../../outside.toml', key: 'id')
+class Entry {
+  const Entry({required this.id});
+  final String id;
+}
+''',
+        ),
+        rootPackage: 'tomgen',
+        generateFor: const {'tomgen|lib/model.dart'},
+        flattenOutput: true,
+      );
+
+      expect(result.succeeded, isFalse);
+      expect(
+        result.errors.join('\n'),
+        allOf(contains('without a digest'), contains('tomgen build')),
+      );
+    });
+  });
+
   group('TOML obfuscation metadata', () {
     test('accepts matching fields in any order and omits metadata', () async {
       for (final fields in <String>['"name", "value"', '"value", "name"']) {
@@ -1514,9 +1649,10 @@ Map<String, String> _typedAssets({
 }) => <String, String>{
   'tomg|lib/tomg.dart': '''
 class TomgRegistry {
-  const TomgRegistry(this.source, {required this.key});
+  const TomgRegistry(this.source, {required this.key, this.digest});
   final String source;
   final String key;
+  final String? digest;
 }
 
 class Obfus {
@@ -1543,9 +1679,10 @@ Map<String, String> _assets(
 }) => <String, String>{
   'tomg|lib/tomg.dart': '''
 class TomgRegistry {
-  const TomgRegistry(this.source, {required this.key});
+  const TomgRegistry(this.source, {required this.key, this.digest});
   final String source;
   final String key;
+  final String? digest;
 }
 
 class Obfus {

@@ -1,3 +1,8 @@
+## 0.2.0
+
+- Add the optional `TomgRegistry.digest` content pin used by tomgen for
+  workspace-external TOML sources while preserving existing annotation calls.
+
 ## 0.1.0
 
 Initial release.

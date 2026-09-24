@@ -112,6 +112,7 @@ final class TomgenInitializer {
       name: request.target,
       sourceRelative: sourceRelative,
       sourceFile: sourceFile,
+      isExternal: false,
       outputFile: File(p.join(outputPath, '${request.target}.dart')),
       model: request.model,
       key: request.key,

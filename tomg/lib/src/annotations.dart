@@ -8,7 +8,7 @@
 /// The annotated class must have a `const` unnamed constructor with named
 /// parameters matching the TOML tables' keys.
 class TomgRegistry {
-  const TomgRegistry(this.source, {required this.key});
+  const TomgRegistry(this.source, {required this.key, this.digest});
 
   /// Where the TOML file lives. Consumed only at build time - never a
   /// bundled runtime asset. Two forms:
@@ -32,6 +32,12 @@ class TomgRegistry {
   /// The name of the constructor parameter (and field) whose value becomes
   /// this instance's key in the generated registry map.
   final String key;
+
+  /// Optional content pin for a CLI-generated source outside the annotated
+  /// package. The supported form is `sha256:<64 lowercase hex characters>`.
+  ///
+  /// Existing package-local and model-first annotations leave this null.
+  final String? digest;
 }
 
 /// Marks a field as obfuscated: `tomgen` stores its value as ciphertext in

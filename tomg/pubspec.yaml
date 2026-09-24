@@ -3,7 +3,7 @@ description: >-
   Runtime for dart-tomg: annotations, the Obfuscated<D> interface, and the
   reversible codec behind .deobf. Generated code from tomgen depends on this
   at build time; apps depend on it at runtime.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/ZackaryW/dart-tomg/tree/main/tomg
 issue_tracker: https://github.com/ZackaryW/dart-tomg/issues
 topics:

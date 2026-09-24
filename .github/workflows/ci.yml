@@ -71,3 +71,49 @@ jobs:
       - name: Dry-run tomgen archive
         if: matrix.sdk == '3.12.2'
         run: dart pub -C tomgen publish --dry-run
+
+  lowest-bounds:
+    name: Lowest dependency bounds
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.2"
+
+      - name: Pin declared lower bounds
+        run: |
+          printf '%s\n' \
+            'dependency_overrides:' \
+            '  analyzer: 10.0.1' \
+            '  source_gen: 4.2.3' \
+            '  dart_style: 3.1.7' \
+            '  test: 1.31.0' \
+            > pubspec_overrides.yaml
+
+      - name: Resolve workspace dependencies
+        run: dart pub get
+
+      - name: Analyze workspace
+        run: dart analyze
+
+      - name: Test tomgen
+        run: dart test tomgen
+
+      - name: Test isolated consumers
+        run: dart test ci_test
+
+      - name: Regenerate example
+        run: dart run tomgen build
+        working-directory: example
+
+      - name: Test example
+        run: dart test
+        working-directory: example
+
+      - name: Check generated example diff
+        run: git diff --exit-code -- example/lib/generated

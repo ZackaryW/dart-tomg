@@ -51,6 +51,12 @@ void main() {
       ),
       contains(contains('warning suppression')),
     );
+    expect(
+      _validateWorkflow(
+        workflow.replaceFirst('  analyzer: 10.0.1', '  analyzer: 10.0.2'),
+      ),
+      contains(contains('analyzer: 10.0.1')),
+    );
   });
 }
 
@@ -158,6 +164,46 @@ List<String> _validateWorkflow(String source) {
   if (source.contains('--ignore-warnings') ||
       source.contains('--skip-validation')) {
     issues.add('Publish dry-runs must not use warning suppression.');
+  }
+
+  final lowest = jobs['lowest-bounds'];
+  if (lowest is! YamlMap) {
+    issues.add('Missing lowest-bounds job.');
+    return issues;
+  }
+  if (lowest['runs-on'] != 'ubuntu-latest') {
+    issues.add('Lowest-bounds job must run on ubuntu-latest.');
+  }
+  final lowestSteps = lowest['steps'];
+  if (lowestSteps is! YamlList) {
+    issues.add('Lowest-bounds steps missing.');
+    return issues;
+  }
+  final lowestCommands = <String>[];
+  for (final step in lowestSteps.whereType<YamlMap>()) {
+    final run = step['run'];
+    if (run is String) lowestCommands.add(run.trim());
+  }
+  for (final pin in <String>[
+    'analyzer: 10.0.1',
+    'source_gen: 4.2.3',
+    'dart_style: 3.1.7',
+    'test: 1.31.0',
+  ]) {
+    if (!source.contains(pin)) issues.add('Lowest-bounds job must pin $pin.');
+  }
+  for (final command in <String>[
+    'dart pub get',
+    'dart analyze',
+    'dart test tomgen',
+    'dart test ci_test',
+    'dart run tomgen build',
+    'dart test',
+    'git diff --exit-code -- example/lib/generated',
+  ]) {
+    if (!lowestCommands.contains(command)) {
+      issues.add('Lowest-bounds job missing command: $command');
+    }
   }
   return issues;
 }

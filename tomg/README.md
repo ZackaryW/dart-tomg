@@ -94,8 +94,9 @@ happens at runtime. `endpoint.url` (the ciphertext) stays a real `const`.
 
 ## What's exported
 
-- `@TomgRegistry(source, {required key})` - marks a class as `tomgen`'s
-  generation target.
+- `@TomgRegistry(source, {required key, digest})` - marks a class as `tomgen`'s
+  generation target. The optional digest is emitted by tomgen for TOML shared
+  from outside a package and normally is not written by hand.
 - `@Obfus()` - marks a field as obfuscated.
 - `Obfuscated<D>` - the interface an annotated class implements to expose its
   generated decode companion `D` via `deobf`.

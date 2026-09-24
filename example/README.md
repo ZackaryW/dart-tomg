@@ -24,8 +24,8 @@ does not merge into an established manifest.
 It contains two focused registries:
 
 - `ApiEndpoint` demonstrates scalar fields, defaults, environment fallback,
-  TOML obfuscation metadata, generated `@Obfus` declarations, ciphertext
-  storage, and typed decoded access.
+  TOML obfuscation metadata, a ciphertext-keyed registry, generated `@Obfus`
+  declarations, ciphertext storage, and typed decoded access.
 - `ServicePlan` demonstrates enum keys, scalar and enum lists, an
   environment-backed list item, and an optional nullable field.
 
@@ -76,12 +76,14 @@ The API endpoint TOML declares obfuscation next to its data:
 
 ```toml
 [__tomg]
-obfuscate = ["url"]
+obfuscate = ["id", "url"]
 ```
 
 Phase one generates matching Dart `@Obfus` declarations. Phase two checks that
-agreement, excludes metadata from the registry, stores ciphertext in
-`endpoint.url`, and exposes the original value through `endpoint.deobf.url`.
+agreement, excludes metadata and TOML table names from the registry, keys the
+map by the encoded `id`, stores ciphertext in `endpoint.id` and `endpoint.url`,
+and exposes the original values through the decoded companion. Encode a lookup
+candidate with `TomgCodec.encodeString(id)` before indexing the map.
 
 The consumer's `build.yaml` makes external TOML visible to build_runner. The
 initializer adds the selected file automatically; this example widens that

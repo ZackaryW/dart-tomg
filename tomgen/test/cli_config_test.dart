@@ -145,6 +145,10 @@ void main() {
         TomgenProject.discover(nested).root.resolveSymbolicLinksSync(),
         package.root.resolveSymbolicLinksSync(),
       );
+      expect(
+        TomgenProject.discover(nested).sourceBoundary.path,
+        package.root.resolveSymbolicLinksSync(),
+      );
     });
 
     test('reports missing and malformed pubspec files', () {
@@ -158,6 +162,35 @@ void main() {
       expect(
         () => TomgenProject.discover(package.root),
         throwsA(isA<TomgenException>()),
+      );
+    });
+
+    test('package configuration mapping verifies the requested identity', () {
+      final root = Directory.systemTemp.createTempSync('tomgen_package_map_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final mapped = Directory(p.join(root.path, 'mapped'))..createSync();
+      File(p.join(mapped.path, 'pubspec.yaml')).writeAsStringSync('''
+name: actual_package
+environment:
+  sdk: ^3.12.2
+''');
+      final config = File(
+        p.join(root.path, '.dart_tool', 'package_config.json'),
+      );
+      config.parent.createSync();
+      config.writeAsStringSync('''
+{"configVersion":2,"packages":[{"name":"requested_package","rootUri":"../mapped/","packageUri":"lib/"}]}
+''');
+
+      expect(
+        () => locateConfiguredPackageRoot('requested_package', start: root),
+        throwsA(
+          isA<TomgenException>().having(
+            (error) => error.message,
+            'message',
+            allOf(contains('requested_package'), contains('actual_package')),
+          ),
+        ),
       );
     });
   });
@@ -261,6 +294,19 @@ key = "id"
 
         final outsideToml = File(p.join(outside.path, 'outside.toml'))
           ..writeAsStringSync('[x]\nid = "x"\n');
+        package.write('g.toml', '''
+version = 1
+output = "lib/generated"
+[targets.items]
+source = "${p.relative(outsideToml.path, from: package.root.path).replaceAll('\\', '/')}"
+model = "Item"
+key = "id"
+''');
+        expect(
+          () => TomgenConfig.load(TomgenProject.discover(package.root)),
+          throwsA(isA<TomgenException>()),
+        );
+
         final sourceLink = Link(
           p.join(package.root.path, 'config', 'escape.toml'),
         );
@@ -280,5 +326,66 @@ key = "id"
         expect(outsideToml.readAsStringSync(), contains('id = "x"'));
       },
     );
+
+    test('accepts only workspace-contained external sources', () {
+      final workspace = Directory.systemTemp.createTempSync(
+        'tomgen_workspace_',
+      );
+      final outside = Directory.systemTemp.createTempSync('tomgen_external_');
+      addTearDown(() {
+        if (workspace.existsSync()) workspace.deleteSync(recursive: true);
+        if (outside.existsSync()) outside.deleteSync(recursive: true);
+      });
+      final app = Directory(p.join(workspace.path, 'packages', 'app'))
+        ..createSync(recursive: true);
+      Directory(p.join(app.path, 'lib')).createSync();
+      File(p.join(workspace.path, 'pubspec.yaml')).writeAsStringSync('''
+name: enclosing_workspace
+publish_to: none
+environment:
+  sdk: ^3.12.2
+workspace:
+  - packages/app
+''');
+      File(p.join(app.path, 'pubspec.yaml')).writeAsStringSync('''
+name: workspace_app
+environment:
+  sdk: ^3.12.2
+resolution: workspace
+''');
+      final shared = File(p.join(workspace.path, 'config', 'items.toml'));
+      shared.parent.createSync(recursive: true);
+      shared.writeAsStringSync('[one]\nid = "one"\n');
+      void writeManifest(String source) {
+        File(p.join(app.path, 'g.toml')).writeAsStringSync('''
+version = 1
+output = "lib/generated"
+[targets.items]
+source = "$source"
+model = "Item"
+key = "id"
+''');
+      }
+
+      writeManifest('../../config/items.toml');
+      final project = TomgenProject.discover(app);
+      expect(
+        project.sourceBoundary.resolveSymbolicLinksSync(),
+        workspace.resolveSymbolicLinksSync(),
+      );
+      final target = TomgenConfig.load(project).targets.single;
+      expect(target.isExternal, isTrue);
+      expect(target.sourceRelative, p.join('..', '..', 'config', 'items.toml'));
+
+      final outsideFile = File(p.join(outside.path, 'outside.toml'))
+        ..writeAsStringSync('[one]\nid = "one"\n');
+      writeManifest(p.relative(outsideFile.path, from: app.path));
+      expect(() => TomgenConfig.load(project), throwsA(isA<TomgenException>()));
+
+      final escape = Link(p.join(workspace.path, 'config', 'escape.toml'));
+      escape.createSync(outsideFile.path);
+      writeManifest('../../config/escape.toml');
+      expect(() => TomgenConfig.load(project), throwsA(isA<TomgenException>()));
+    });
   });
 }

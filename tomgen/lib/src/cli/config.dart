@@ -178,6 +178,7 @@ final class TomgenTarget {
     required this.name,
     required this.sourceRelative,
     required this.sourceFile,
+    required this.isExternal,
     required this.outputFile,
     required this.model,
     required this.key,
@@ -188,6 +189,7 @@ final class TomgenTarget {
   final String name;
   final String sourceRelative;
   final File sourceFile;
+  final bool isExternal;
   final File outputFile;
   final String model;
   final String key;
@@ -213,8 +215,9 @@ final class TomgenTarget {
     _requireIdentifier(model, 'model for target "$name"');
     _requireIdentifier(key, 'key for target "$name"');
 
-    final sourcePath = resolveContainedPath(
-      root: project.root,
+    final sourcePath = resolveProjectSourcePath(
+      packageRoot: project.root,
+      boundary: project.sourceBoundary,
       relativePath: source,
       description: 'source for target "$name"',
       mustExist: true,
@@ -270,6 +273,7 @@ final class TomgenTarget {
       name: name,
       sourceRelative: p.relative(sourcePath, from: project.root.path),
       sourceFile: File(sourcePath),
+      isExternal: !isContainedBy(project.root, sourcePath),
       outputFile: File(p.join(outputDirectory.path, '$name.dart')),
       model: model,
       key: key,

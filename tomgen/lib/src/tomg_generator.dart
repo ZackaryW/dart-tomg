@@ -6,9 +6,13 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:build/build.dart';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
 import 'package:source_gen/source_gen.dart';
 import 'package:tomg/tomg.dart';
 
+import 'cli/errors.dart';
+import 'cli/project.dart';
 import 'registry_document.dart';
 
 /// Generates a `const` registry (and, where needed, a typed decode
@@ -18,6 +22,7 @@ import 'registry_document.dart';
 /// `.../specs/field-obfuscation/spec.md` for the behavior this implements.
 class TomgGenerator extends GeneratorForAnnotation<TomgRegistry> {
   static const _obfusChecker = TypeChecker.typeNamed(Obfus);
+  static final _digestPattern = RegExp(r'^sha256:[0-9a-f]{64}$');
   static final _environmentReference = RegExp(
     r'^\$([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$',
     dotAll: true,
@@ -46,19 +51,17 @@ class TomgGenerator extends GeneratorForAnnotation<TomgRegistry> {
 
     final source = annotation.read('source').stringValue;
     final keyField = annotation.read('key').stringValue;
-
-    final tomlAssetId = AssetId.resolve(
-      Uri.parse(source),
-      from: buildStep.inputId,
+    final digestReader = annotation.peek('digest');
+    final sourceDigest = digestReader == null || digestReader.isNull
+        ? null
+        : digestReader.stringValue;
+    final tomlContent = await _readTomlContent(
+      source: source,
+      digest: sourceDigest,
+      className: className,
+      element: element,
+      buildStep: buildStep,
     );
-    if (!await buildStep.canRead(tomlAssetId)) {
-      throw InvalidGenerationSourceError(
-        '@TomgRegistry on $className names "$source", but no such build '
-        'input was found at ${tomlAssetId.path}.',
-        element: element,
-      );
-    }
-    final tomlContent = await buildStep.readAsString(tomlAssetId);
 
     final TomgRegistryDocument registryDocument;
     try {
@@ -246,6 +249,111 @@ class TomgGenerator extends GeneratorForAnnotation<TomgRegistry> {
     }
 
     return buffer.toString();
+  }
+
+  Future<String> _readTomlContent({
+    required String source,
+    required String? digest,
+    required String className,
+    required Element element,
+    required BuildStep buildStep,
+  }) async {
+    if (digest == null) {
+      final sourceUri = Uri.parse(source);
+      if (!sourceUri.hasScheme) {
+        final normalized = p.url.normalize(
+          p.url.join(p.url.dirname(buildStep.inputId.path), source),
+        );
+        if (normalized == '..' || normalized.startsWith('../')) {
+          throw InvalidGenerationSourceError(
+            '@TomgRegistry on $className names external source "$source" '
+            'without a digest. Run `dart run tomgen build` to regenerate the '
+            'model.',
+            element: element,
+          );
+        }
+      }
+      final AssetId tomlAssetId;
+      try {
+        tomlAssetId = AssetId.resolve(sourceUri, from: buildStep.inputId);
+      } on Object {
+        throw InvalidGenerationSourceError(
+          '@TomgRegistry on $className names external source "$source" '
+          'without a digest. Run `dart run tomgen build` to regenerate the '
+          'model.',
+          element: element,
+        );
+      }
+      if (tomlAssetId.package != buildStep.inputId.package) {
+        throw InvalidGenerationSourceError(
+          '@TomgRegistry on $className names external source "$source" '
+          'without a digest. Run `dart run tomgen build` to regenerate the '
+          'model.',
+          element: element,
+        );
+      }
+      if (!await buildStep.canRead(tomlAssetId)) {
+        throw InvalidGenerationSourceError(
+          '@TomgRegistry on $className names "$source", but no such build '
+          'input was found at ${tomlAssetId.path}.',
+          element: element,
+        );
+      }
+      return buildStep.readAsString(tomlAssetId);
+    }
+
+    if (!_digestPattern.hasMatch(digest)) {
+      throw InvalidGenerationSourceError(
+        '@TomgRegistry on $className has malformed digest "$digest" for '
+        '"$source"; expected sha256 followed by 64 lowercase hexadecimal '
+        'characters. Run `dart run tomgen build` to regenerate the model.',
+        element: element,
+      );
+    }
+
+    try {
+      final packageRoot = locateConfiguredPackageRoot(
+        buildStep.inputId.package,
+      );
+      final boundary = discoverSourceBoundary(packageRoot);
+      final sourcePath = resolveProjectSourcePath(
+        packageRoot: packageRoot,
+        boundary: boundary,
+        relativePath: source,
+        description: 'external source "$source" for $className',
+        mustExist: true,
+      );
+      if (isContainedBy(packageRoot, sourcePath)) {
+        throw const TomgenException(
+          'A digest is only valid for a source outside the package.',
+        );
+      }
+      final sourceFile = File(sourcePath);
+      if (FileSystemEntity.typeSync(sourcePath) != FileSystemEntityType.file) {
+        throw TomgenException('External source is not a file: $sourcePath');
+      }
+      final bytes = sourceFile.readAsBytesSync();
+      final actual = 'sha256:${sha256.convert(bytes)}';
+      if (actual != digest) {
+        throw TomgenException(
+          'External source "$source" is stale: its SHA-256 digest no longer '
+          'matches the generated model.',
+        );
+      }
+      return utf8.decode(bytes);
+    } on TomgenException catch (error) {
+      throw InvalidGenerationSourceError(
+        '@TomgRegistry on $className cannot read "$source": ${error.message} '
+        'Run `dart run tomgen build` to regenerate the model.',
+        element: element,
+      );
+    } on FileSystemException catch (error) {
+      throw InvalidGenerationSourceError(
+        '@TomgRegistry on $className cannot read "$source": ${error.message} '
+        'Run `dart run tomgen build` to regenerate the model.',
+        element: element,
+      );
+    }
   }
 
   void _validateObfuscationMetadataAgreement(

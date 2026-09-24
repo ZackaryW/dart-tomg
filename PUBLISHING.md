@@ -11,7 +11,7 @@ This repo holds two packages that must be published **in order**, because
 ```
 
 The repository is a Pub workspace. `tomgen` declares the publishable hosted
-constraint `tomg: ^0.1.0`, while workspace resolution automatically uses the
+constraint `tomg: ^0.2.0`, while workspace resolution automatically uses the
 local `tomg` package during development. No manifest rewriting is required.
 
 ## Validate the workspace
@@ -45,6 +45,45 @@ warnings fail CI; do not use `--ignore-warnings` or `--skip-validation`.
 
 Then inspect the complete working tree. Publishing warns about uncommitted
 files, so perform release dry runs from the exact commit intended for release.
+
+## Verify declared lower bounds
+
+The dedicated CI job pins only the generator stack whose public lower bounds
+tomgen declares. Reproduce it from a scratch checkout so the temporary workspace
+override never affects the working repository:
+
+```sh
+scratch_dir="$(mktemp -d)"
+git archive HEAD | tar -x -C "$scratch_dir"
+cd "$scratch_dir"
+printf '%s\n' \
+  'dependency_overrides:' \
+  '  analyzer: 10.0.1' \
+  '  source_gen: 4.2.3' \
+  '  dart_style: 3.1.7' \
+  '  test: 1.31.0' \
+  > pubspec_overrides.yaml
+dart pub get
+dart analyze
+dart test tomgen
+dart test ci_test
+cd example
+dart run tomgen build
+dart test
+cd ..
+git diff --exit-code -- example/lib/generated
+```
+
+The expected 0.2.0 baseline is 106 tomgen tests, 3 isolated-consumer tests, 9
+example tests, and no generated example diff. Remove the scratch directory
+after inspection.
+
+## Releasing 0.2.0
+
+Version 0.2.0 adds the optional runtime digest annotation and the generator
+behavior that consumes it, so both packages advance together. Complete the
+default and lowest-bounds gates, then publish `tomg` 0.2.0 first. Wait until
+pub.dev resolves it before publishing `tomgen` 0.2.0.
 
 ## 1. Publish `tomg`
 

@@ -1,5 +1,11 @@
-## Unreleased
+## 0.2.0
 
+- Widen analyzer, source_gen, and dart_style ranges to their verified lower
+  bounds and enforce those bounds in CI.
+- Document and test ciphertext-keyed registries for obfuscated key fields.
+- Support digest-pinned TOML-first sources outside a package but inside its
+  enclosing pub workspace, including fresh-clone build_runner generation and
+  actionable stale-source errors.
 - Add safe, idempotent `tomgen init` scaffolding for a starter registry or an
   existing TOML source, including dependency diagnostics, external build input
   configuration, conflict preflight, and rollback-capable file updates.
