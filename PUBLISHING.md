@@ -56,6 +56,7 @@ override never affects the working repository:
 scratch_dir="$(mktemp -d)"
 git archive HEAD | tar -x -C "$scratch_dir"
 cd "$scratch_dir"
+cp -R example/lib/generated "$scratch_dir/generated-before"
 printf '%s\n' \
   'dependency_overrides:' \
   '  analyzer: 10.0.1' \
@@ -71,7 +72,7 @@ cd example
 dart run tomgen build
 dart test
 cd ..
-git diff --exit-code -- example/lib/generated
+diff -ru "$scratch_dir/generated-before" example/lib/generated
 ```
 
 The expected 0.2.1 baseline is 107 tomgen tests, 3 isolated-consumer tests, 9
